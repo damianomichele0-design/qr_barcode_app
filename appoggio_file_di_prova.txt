@@ -1,0 +1,710 @@
+import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:flutter/services.dart';
+import 'dart:async';
+import 'package:url_launcher/url_launcher.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'QR & Barcode App',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        brightness: Brightness.light,
+      ),
+      home: const HomePage(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+// PAGINA PRINCIPALE
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+  @override
+  HomePageState createState() => HomePageState();
+}
+
+class HomePageState extends State<HomePage> {
+  List<Map<String, String>> storicoScansioni = [];
+  List<Map<String, String>> storicoQRGenerati = [];
+
+  void aggiungiScansione(String codice) {
+    setState(() {
+      storicoScansioni.insert(0, {
+        'codice': codice,
+        'data': DateTime.now().toString().substring(0, 16),
+      });
+    });
+  }
+
+  void aggiungiQRGenerato(String testo) {
+    setState(() {
+      storicoQRGenerati.insert(0, {
+        'testo': testo,
+        'data': DateTime.now().toString().substring(0, 16),
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('QR & Barcode App'), centerTitle: true),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              const Icon(Icons.qr_code_scanner, size: 100, color: Colors.blue),
+              const SizedBox(height: 30),
+
+              // Bottone SCANSIONA
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final risultato = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ScannerPage(),
+                    ),
+                  );
+                  if (risultato != null) {
+                    aggiungiScansione(risultato);
+                  }
+                },
+                icon: const Icon(Icons.camera_alt, size: 30),
+                label: const Text(
+                  'Scansiona QR/Barcode',
+                  style: TextStyle(fontSize: 18),
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 15,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Bottone CREA
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final risultato = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const GeneratorPage(),
+                    ),
+                  );
+                  if (risultato != null) {
+                    aggiungiQRGenerato(risultato);
+                  }
+                },
+                icon: const Icon(Icons.qr_code, size: 30),
+                label: const Text(
+                  'Crea QR Code',
+                  style: TextStyle(fontSize: 18),
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 15,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              // STORICO SCANSIONI
+              if (storicoScansioni.isNotEmpty) ...[
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Scansioni Recenti',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: storicoScansioni.length > 5
+                      ? 5
+                      : storicoScansioni.length,
+                  itemBuilder: (context, index) {
+                    final item = storicoScansioni[index];
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.qr_code_scanner,
+                          color: Colors.blue,
+                        ),
+                        title: Text(
+                          item['codice']!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(item['data']!),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          _mostraDettagliScansione(context, item['codice']!);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ],
+
+              const SizedBox(height: 20),
+
+              // STORICO QR GENERATI
+              if (storicoQRGenerati.isNotEmpty) ...[
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'QR Code Generati',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: storicoQRGenerati.length > 5
+                      ? 5
+                      : storicoQRGenerati.length,
+                  itemBuilder: (context, index) {
+                    final item = storicoQRGenerati[index];
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.qr_code, color: Colors.green),
+                        title: Text(
+                          item['testo']!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(item['data']!),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          _mostraQRGenerato(context, item['testo']!);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _mostraDettagliScansione(BuildContext context, String codice) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Codice Scansionato'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SelectableText(codice),
+            const SizedBox(height: 20),
+            if (_isUrl(codice))
+              ElevatedButton.icon(
+                onPressed: () {
+                  _apriUrl(codice);
+                },
+                icon: const Icon(Icons.open_in_browser),
+                label: const Text('Apri Link'),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: codice));
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Copiato negli appunti!')),
+              );
+            },
+            child: const Text('Copia'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Chiudi'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostraQRGenerato(BuildContext context, String testo) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('QR Code Generato'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 200,
+              height: 200,
+              child: QrImageView(data: testo, version: QrVersions.auto),
+            ),
+            const SizedBox(height: 10),
+            Text(testo, textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Chiudi'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _isUrl(String text) {
+    return text.startsWith('http://') || text.startsWith('https://');
+  }
+
+  Future<void> _apriUrl(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+}
+
+// PAGINA PER SCANSIONARE
+class ScannerPage extends StatefulWidget {
+  const ScannerPage({super.key});
+  @override
+  ScannerPageState createState() => ScannerPageState();
+}
+
+class ScannerPageState extends State<ScannerPage> {
+  MobileScannerController cameraController = MobileScannerController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Scansiona Codice'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.flash_on),
+            onPressed: () {
+              cameraController.toggleTorch();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.cameraswitch),
+            onPressed: () {
+              cameraController.switchCamera();
+            },
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: cameraController,
+            onDetect: (capture) {
+              final List<Barcode> barcodes = capture.barcodes;
+              for (final barcode in barcodes) {
+                if (barcode.rawValue != null) {
+                  _mostraRisultato(barcode.rawValue!);
+                  return;
+                }
+              }
+            },
+          ),
+          const ScannerOverlay(),
+          Positioned(
+            bottom: 20,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Posiziona il codice nell\'area centrale',
+                  style: TextStyle(color: Colors.white, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostraRisultato(String codice) {
+    cameraController.stop();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Codice Rilevato!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 60),
+            const SizedBox(height: 15),
+            SelectableText(
+              codice,
+              style: const TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          if (_isUrl(codice))
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pop(context, codice);
+                _apriUrl(codice);
+              },
+              icon: const Icon(Icons.open_in_browser),
+              label: const Text('Apri Link'),
+            ),
+          TextButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: codice));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Copiato negli appunti!')),
+              );
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text('Copia'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context, codice);
+            },
+            child: const Text('Salva ed Esci'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              cameraController.start();
+            },
+            child: const Text('Scansiona Altro'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _isUrl(String text) {
+    return text.startsWith('http://') || text.startsWith('https://');
+  }
+
+  Future<void> _apriUrl(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  void dispose() {
+    cameraController.dispose();
+    super.dispose();
+  }
+}
+
+// OVERLAY SCANNER CON ANIMAZIONE LASER
+class ScannerOverlay extends StatefulWidget {
+  const ScannerOverlay({super.key});
+  @override
+  ScannerOverlayState createState() => ScannerOverlayState();
+}
+
+class ScannerOverlayState extends State<ScannerOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _animation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(_animationController);
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return CustomPaint(
+          painter: ScannerOverlayPainter(_animation.value),
+          child: Container(),
+        );
+      },
+    );
+  }
+}
+
+class ScannerOverlayPainter extends CustomPainter {
+  final double animationValue;
+
+  ScannerOverlayPainter(this.animationValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double scanAreaWidth = size.width * 0.7;
+    final double scanAreaHeight = size.height * 0.4;
+
+    final double left = (size.width - scanAreaWidth) / 2;
+    final double top = (size.height - scanAreaHeight) / 2;
+    final double right = left + scanAreaWidth;
+    final double bottom = top + scanAreaHeight;
+
+    // Area scura
+    final Paint darkPaint = Paint()..color = Colors.black.withOpacity(0.5);
+
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, top), darkPaint);
+    canvas.drawRect(Rect.fromLTWH(0, top, left, scanAreaHeight), darkPaint);
+    canvas.drawRect(
+      Rect.fromLTWH(right, top, size.width - right, scanAreaHeight),
+      darkPaint,
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(0, bottom, size.width, size.height - bottom),
+      darkPaint,
+    );
+
+    // Bordo
+    final Paint borderPaint = Paint()
+      ..color = Colors.greenAccent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+
+    canvas.drawRect(Rect.fromLTRB(left, top, right, bottom), borderPaint);
+
+    // Angoli
+    final Paint cornerPaint = Paint()
+      ..color = Colors.greenAccent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6;
+
+    double cornerLength = 30;
+
+    canvas.drawLine(
+      Offset(left, top),
+      Offset(left + cornerLength, top),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(left, top),
+      Offset(left, top + cornerLength),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(right, top),
+      Offset(right - cornerLength, top),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(right, top),
+      Offset(right, top + cornerLength),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(left, bottom),
+      Offset(left + cornerLength, bottom),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(left, bottom),
+      Offset(left, bottom - cornerLength),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(right, bottom),
+      Offset(right - cornerLength, bottom),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(right, bottom),
+      Offset(right, bottom - cornerLength),
+      cornerPaint,
+    );
+
+    // LINEA LASER ANIMATA
+    final Paint laserPaint = Paint()
+      ..color = Colors.redAccent.withOpacity(0.7)
+      ..strokeWidth = 2;
+
+    final double laserY = top + (scanAreaHeight * animationValue);
+    canvas.drawLine(Offset(left, laserY), Offset(right, laserY), laserPaint);
+
+    // Bagliore laser
+    final Paint glowPaint = Paint()
+      ..color = Colors.redAccent.withOpacity(0.3)
+      ..strokeWidth = 8
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4);
+
+    canvas.drawLine(Offset(left, laserY), Offset(right, laserY), glowPaint);
+  }
+
+  @override
+  bool shouldRepaint(ScannerOverlayPainter oldDelegate) {
+    return animationValue != oldDelegate.animationValue;
+  }
+}
+
+/// PAGINA PER GENERARE QR CODE
+class GeneratorPage extends StatefulWidget {
+  const GeneratorPage({super.key});
+  @override
+  GeneratorPageState createState() => GeneratorPageState();
+}
+
+class GeneratorPageState extends State<GeneratorPage> {
+  TextEditingController testoController = TextEditingController();
+  String testoQR = '';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Genera QR Code')),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              TextField(
+                controller: testoController,
+                decoration: const InputDecoration(
+                  labelText: 'Inserisci testo o URL',
+                  border: OutlineInputBorder(),
+                  hintText: 'Es: https://www.google.com',
+                ),
+                maxLines: 3,
+              ),
+
+              const SizedBox(height: 20),
+
+              ElevatedButton.icon(
+                onPressed: () {
+                  if (testoController.text.isNotEmpty) {
+                    setState(() {
+                      testoQR = testoController.text;
+                    });
+                  }
+                },
+                icon: const Icon(Icons.create),
+                label: const Text('Genera QR Code'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 15,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              if (testoQR.isNotEmpty)
+                Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.3),
+                            spreadRadius: 2,
+                            blurRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: QrImageView(
+                        data: testoQR,
+                        version: QrVersions.auto,
+                        size: 250.0,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context, testoQR);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('QR Code salvato!')),
+                            );
+                          },
+                          icon: const Icon(Icons.save),
+                          label: const Text('Salva'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              testoQR = '';
+                              testoController.clear();
+                            });
+                          },
+                          icon: const Icon(Icons.clear),
+                          label: const Text('Cancella'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

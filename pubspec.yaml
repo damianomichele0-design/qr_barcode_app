@@ -1,0 +1,33 @@
+name: qr_barcode_app
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  mobile_scanner: ^5.2.3
+  qr_flutter: ^4.1.0
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.0
+  share_plus: ^7.0.0
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon/
